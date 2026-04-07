@@ -1,67 +1,100 @@
 const express = require("express");
 const axios = require("axios");
 const GtfsRealtimeBindings = require("gtfs-realtime-bindings");
-const Redis = require("ioredis");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// 🔑 Add your MTA API key later
-const MTA_API_KEY = process.env.MTA_API_KEY;
+const FEED_URL =
+  "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts";
 
-// Redis (we’ll plug this later)
-let redis;
-if (process.env.REDIS_URL) {
-  redis = new Redis(process.env.REDIS_URL);
-}
+const ALL_LINES = [
+  "A","C","E","B","D","F","M","G","J","Z",
+  "N","Q","R","W","L","1","2","3","4","5","6","7"
+];
 
-// Example feed (A/C/E)
-const FEED_URL = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace";
-
-// Simple classifier
 function classify(text) {
-  text = text.toLowerCase();
+  text = (text || "").toLowerCase();
 
-  if (text.includes("suspend")) return "SUSPENDED";
-  if (text.includes("delay") || text.includes("slow")) return "DELAYS";
+  if (
+    text.includes("suspend") ||
+    text.includes("no trains") ||
+    text.includes("part suspended")
+  ) {
+    return "SUSPENDED";
+  }
+
+  if (
+    text.includes("delay") ||
+    text.includes("slow") ||
+    text.includes("signal") ||
+    text.includes("train traffic") ||
+    text.includes("reroute") ||
+    text.includes("reduced service")
+  ) {
+    return "DELAYS";
+  }
+
   return "GOOD SERVICE";
 }
 
-// Fetch + decode MTA
 async function fetchMTA() {
   const res = await axios.get(FEED_URL, {
     responseType: "arraybuffer",
-    headers: {
-      "x-api-key": MTA_API_KEY
-    }
+    timeout: 15000
   });
 
   const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(
     new Uint8Array(res.data)
   );
 
-  let status = "GOOD SERVICE";
-
-  feed.entity.forEach(entity => {
-    if (entity.alert) {
-      const text =
-        entity.alert.headerText?.translation?.[0]?.text || "";
-
-      const result = classify(text);
-
-      if (result === "SUSPENDED") status = "SUSPENDED";
-      else if (result === "DELAYS" && status !== "SUSPENDED") status = "DELAYS";
-    }
+  const lineStatus = {};
+  ALL_LINES.forEach((line) => {
+    lineStatus[line] = "GOOD SERVICE";
   });
+
+  for (const entity of feed.entity || []) {
+    if (!entity.alert) continue;
+
+    const text =
+      entity.alert.headerText?.translation?.[0]?.text ||
+      entity.alert.descriptionText?.translation?.[0]?.text ||
+      "";
+
+    const status = classify(text);
+
+    for (const line of ALL_LINES) {
+      const regex = new RegExp(`\\b${line}\\b`, "i");
+
+      if (regex.test(text)) {
+        if (status === "SUSPENDED") {
+          lineStatus[line] = "SUSPENDED";
+        } else if (
+          status === "DELAYS" &&
+          lineStatus[line] !== "SUSPENDED"
+        ) {
+          lineStatus[line] = "DELAYS";
+        }
+      }
+    }
+  }
 
   return {
     updatedAt: new Date().toISOString(),
-    line: "ACE",
-    status
+    grouped: {
+      "GOOD SERVICE": Object.keys(lineStatus).filter(
+        (line) => lineStatus[line] === "GOOD SERVICE"
+      ),
+      "DELAYS": Object.keys(lineStatus).filter(
+        (line) => lineStatus[line] === "DELAYS"
+      ),
+      "SUSPENDED": Object.keys(lineStatus).filter(
+        (line) => lineStatus[line] === "SUSPENDED"
+      )
+    }
   };
 }
 
-// Routes
 app.get("/", (req, res) => {
   res.send("MTA API is running");
 });
@@ -72,26 +105,17 @@ app.get("/health", (req, res) => {
 
 app.get("/status.json", async (req, res) => {
   try {
-    // Try cache first
-    if (redis) {
-      const cached = await redis.get("mta:status");
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
-    }
-
     const data = await fetchMTA();
-
-    if (redis) {
-      await redis.set("mta:status", JSON.stringify(data), "EX", 60);
-    }
-
     res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch MTA data" });
+  } catch (error) {
+    console.error("status.json error:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch MTA data",
+      details: error.message
+    });
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
