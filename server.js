@@ -139,7 +139,7 @@ app.get("/status-image.png", async (req, res) => {
     ctx.font = "bold 22px Arial";
     ctx.fillText("NYC Subway Status", 20, 40);
 
-    ctx.font = "18px Arial";
+    ctx.font = "bold 18px Arial";
 
     // Good Service
     ctx.fillStyle = "green";
