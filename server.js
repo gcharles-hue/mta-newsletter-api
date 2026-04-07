@@ -142,9 +142,6 @@ app.get("/status-snippet", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
 const { createCanvas } = require("canvas");
 
 app.get("/status-image.png", async (req, res) => {
@@ -195,4 +192,50 @@ app.get("/status-image.png", async (req, res) => {
   } catch (err) {
     res.status(500).send("Error generating image");
   }
+});
+
+app.get("/status-image.svg", async (req, res) => {
+  try {
+    const data = await fetchMTA();
+
+    const good = data.grouped["GOOD SERVICE"].join(", ") || "None";
+    const delays = data.grouped["DELAYS"].join(", ") || "None";
+    const suspended = data.grouped["SUSPENDED"].join(", ") || "None";
+
+    const updated = new Date(data.updatedAt).toLocaleTimeString();
+
+    const svg = `
+      <svg width="600" height="220" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="white"/>
+
+        <text x="20" y="40" font-size="22" font-family="Arial" font-weight="bold">
+          NYC Subway Status
+        </text>
+
+        <text x="20" y="90" font-size="18" font-family="Arial" fill="green">
+          Good: ${good}
+        </text>
+
+        <text x="20" y="130" font-size="18" font-family="Arial" fill="orange">
+          Delays: ${delays}
+        </text>
+
+        <text x="20" y="170" font-size="18" font-family="Arial" fill="#8B0000">
+          Suspended: ${suspended}
+        </text>
+
+        <text x="20" y="200" font-size="12" font-family="Arial" fill="gray">
+          Updated: ${updated}
+        </text>
+      </svg>
+    `;
+
+    res.setHeader("Content-Type", "image/svg+xml");
+    res.send(svg);
+  } catch (err) {
+    res.status(500).send("Error generating SVG");
+  }
+});
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
