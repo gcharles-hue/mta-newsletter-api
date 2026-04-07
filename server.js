@@ -116,6 +116,32 @@ app.get("/status.json", async (req, res) => {
   }
 });
 
+app.get("/status-snippet", async (req, res) => {
+  try {
+    const data = await fetchMTA();
+
+    const good = data.grouped["GOOD SERVICE"].join(", ");
+    const delays = data.grouped["DELAYS"].join(", ");
+    const suspended = data.grouped["SUSPENDED"].join(", ");
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;">
+        <strong>NYC Subway Status</strong><br><br>
+
+        <span style="color:green;"><strong>Good Service:</strong></span> ${good || "None"}<br>
+        <span style="color:orange;"><strong>Delays:</strong></span> ${delays || "None"}<br>
+        <span style="color:#8B0000;"><strong>Suspended:</strong></span> ${suspended || "None"}<br><br>
+
+        <small>Updated: ${new Date(data.updatedAt).toLocaleTimeString()}</small>
+      </div>
+    `;
+
+    res.send(html);
+  } catch (err) {
+    res.status(500).send("Failed to load status");
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
