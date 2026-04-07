@@ -116,29 +116,56 @@ app.get("/status.json", async (req, res) => {
   }
 });
 
-app.get("/status-snippet", async (req, res) => {
+app.get("/status-image.png", async (req, res) => {
   try {
     const data = await fetchMTA();
 
-    const good = data.grouped["GOOD SERVICE"].join(", ");
-    const delays = data.grouped["DELAYS"].join(", ");
-    const suspended = data.grouped["SUSPENDED"].join(", ");
+    const width = 600;
+    const height = 260;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext("2d");
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;line-height:1.6;">
-        <strong>NYC Subway Status</strong><br><br>
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
 
-        <span style="color:green;"><strong>Good Service:</strong></span> ${good || "None"}<br>
-        <span style="color:orange;"><strong>Delays:</strong></span> ${delays || "None"}<br>
-        <span style="color:#8B0000;"><strong>Suspended:</strong></span> ${suspended || "None"}<br><br>
+    // Title
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 24px Arial";
+    ctx.fillText("NYC Subway Status", 20, 40);
 
-        <small>Updated: ${new Date(data.updatedAt).toLocaleTimeString()}</small>
-      </div>
-    `;
+    ctx.font = "12px Arial";
 
-    res.send(html);
+    const good = data.grouped["GOOD SERVICE"].join(", ") || "None";
+    const delays = data.grouped["DELAYS"].join(", ") || "None";
+    const suspended = data.grouped["SUSPENDED"].join(", ") || "None";
+
+    // Good
+    ctx.fillStyle = "green";
+    ctx.fillText(`Good Service: ${good}`, 20, 100);
+
+    // Delays
+    ctx.fillStyle = "orange";
+    ctx.fillText(`Delays: ${delays}`, 20, 150);
+
+    // Suspended
+    ctx.fillStyle = "#8B0000";
+    ctx.fillText(`Suspended: ${suspended}`, 20, 200);
+
+    // Timestamp
+    ctx.fillStyle = "gray";
+    ctx.font = "12px Arial";
+    ctx.fillText(
+      `Updated: ${new Date(data.updatedAt).toLocaleTimeString()}`,
+      20,
+      240
+    );
+
+    res.setHeader("Content-Type", "image/png");
+    canvas.createPNGStream().pipe(res);
   } catch (err) {
-    res.status(500).send("Failed to load status");
+    console.error(err);
+    res.status(500).send("Error generating PNG");
   }
 });
 
