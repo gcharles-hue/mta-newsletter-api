@@ -16,14 +16,16 @@ const ALL_LINES = [
 function classify(text) {
   text = (text || "").toLowerCase();
 
+  // Strong suspend only
   if (
-    text.includes("suspend") ||
-    text.includes("no trains") ||
-    text.includes("part suspended")
+    text.includes("trains are not running") ||
+    text.includes("no trains running") ||
+    text.includes("service is suspended")
   ) {
     return "SUSPENDED";
   }
 
+  // Delay / disruption
   if (
     text.includes("delay") ||
     text.includes("slow") ||
@@ -116,58 +118,7 @@ app.get("/status.json", async (req, res) => {
   }
 });
 
-app.get("/status-image.png", async (req, res) => {
-  try {
-    const data = await fetchMTA();
 
-    const width = 600;
-    const height = 260;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-
-    // Background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
-
-    // Title
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 24px Arial";
-    ctx.fillText("NYC Subway Status", 20, 40);
-
-    ctx.font = "12px Arial";
-
-    const good = data.grouped["GOOD SERVICE"].join(", ") || "None";
-    const delays = data.grouped["DELAYS"].join(", ") || "None";
-    const suspended = data.grouped["SUSPENDED"].join(", ") || "None";
-
-    // Good
-    ctx.fillStyle = "green";
-    ctx.fillText(`Good Service: ${good}`, 20, 100);
-
-    // Delays
-    ctx.fillStyle = "orange";
-    ctx.fillText(`Delays: ${delays}`, 20, 150);
-
-    // Suspended
-    ctx.fillStyle = "#8B0000";
-    ctx.fillText(`Suspended: ${suspended}`, 20, 200);
-
-    // Timestamp
-    ctx.fillStyle = "gray";
-    ctx.font = "12px Arial";
-    ctx.fillText(
-      `Updated: ${new Date(data.updatedAt).toLocaleTimeString()}`,
-      20,
-      240
-    );
-
-    res.setHeader("Content-Type", "image/png");
-    canvas.createPNGStream().pipe(res);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error generating PNG");
-  }
-});
 
 const { createCanvas } = require("canvas");
 
@@ -225,33 +176,72 @@ app.get("/status-image.svg", async (req, res) => {
   try {
     const data = await fetchMTA();
 
-    const good = data.grouped["GOOD SERVICE"].join(", ") || "None";
-    const delays = data.grouped["DELAYS"].join(", ") || "None";
-    const suspended = data.grouped["SUSPENDED"].join(", ") || "None";
-
     const updated = new Date(data.updatedAt).toLocaleTimeString();
 
+    // MTA colors
+    const COLORS = {
+      A: "#0039A6", C: "#0039A6", E: "#0039A6",
+      B: "#FF6319", D: "#FF6319", F: "#FF6319", M: "#FF6319",
+      G: "#6CBE45",
+      J: "#996633", Z: "#996633",
+      N: "#FCCC0A", Q: "#FCCC0A", R: "#FCCC0A", W: "#FCCC0A",
+      L: "#A7A9AC",
+      "1": "#EE352E", "2": "#EE352E", "3": "#EE352E",
+      "4": "#00933C", "5": "#00933C", "6": "#00933C",
+      "7": "#B933AD"
+    };
+
+    function renderCircles(lines) {
+      return lines.map((line, i) => {
+        const x = 20 + (i % 12) * 45;
+        const yOffset = Math.floor(i / 12) * 50;
+
+        return `
+          <circle cx="${x}" cy="${yOffset}" r="16" fill="${COLORS[line] || "#000"}"/>
+          <text x="${x}" y="${yOffset + 5}" font-size="14" text-anchor="middle" fill="white" font-family="Arial" font-weight="bold">${line}</text>
+        `;
+      }).join("");
+    }
+
+    const good = data.grouped["GOOD SERVICE"];
+    const delays = data.grouped["DELAYS"];
+    const suspended = data.grouped["SUSPENDED"];
+
     const svg = `
-      <svg width="600" height="220" xmlns="http://www.w3.org/2000/svg">
+      <svg width="600" height="320" xmlns="http://www.w3.org/2000/svg">
         <rect width="100%" height="100%" fill="white"/>
 
-        <text x="20" y="40" font-size="22" font-family="Arial" font-weight="bold">
+        <!-- Title -->
+        <text x="20" y="30" font-size="22" font-family="Arial" font-weight="bold">
           NYC Subway Status
         </text>
 
-        <text x="20" y="90" font-size="18" font-family="Arial" fill="green">
-          Good: ${good}
+        <!-- GOOD -->
+        <text x="20" y="70" font-size="16" fill="green" font-family="Arial">
+          Good Service
         </text>
+        <g transform="translate(20,90)">
+          ${renderCircles(good)}
+        </g>
 
-        <text x="20" y="130" font-size="18" font-family="Arial" fill="orange">
-          Delays: ${delays}
+        <!-- DELAYS -->
+        <text x="20" y="170" font-size="16" fill="orange" font-family="Arial">
+          Delays
         </text>
+        <g transform="translate(20,190)">
+          ${renderCircles(delays)}
+        </g>
 
-        <text x="20" y="170" font-size="18" font-family="Arial" fill="#8B0000">
-          Suspended: ${suspended}
+        <!-- SUSPENDED -->
+        <text x="20" y="250" font-size="16" fill="#8B0000" font-family="Arial">
+          Suspended
         </text>
+        <g transform="translate(20,270)">
+          ${renderCircles(suspended)}
+        </g>
 
-        <text x="20" y="200" font-size="12" font-family="Arial" fill="gray">
+        <!-- Timestamp -->
+        <text x="20" y="310" font-size="12" fill="gray" font-family="Arial">
           Updated: ${updated}
         </text>
       </svg>
@@ -259,6 +249,7 @@ app.get("/status-image.svg", async (req, res) => {
 
     res.setHeader("Content-Type", "image/svg+xml");
     res.send(svg);
+
   } catch (err) {
     res.status(500).send("Error generating SVG");
   }
