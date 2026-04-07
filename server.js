@@ -175,10 +175,8 @@ app.get("/status-image.png", async (req, res) => {
 app.get("/status-image.svg", async (req, res) => {
   try {
     const data = await fetchMTA();
-
     const updated = new Date(data.updatedAt).toLocaleTimeString();
 
-    // MTA colors
     const COLORS = {
       A: "#0039A6", C: "#0039A6", E: "#0039A6",
       B: "#FF6319", D: "#FF6319", F: "#FF6319", M: "#FF6319",
@@ -191,69 +189,101 @@ app.get("/status-image.svg", async (req, res) => {
       "7": "#B933AD"
     };
 
-    function renderCircles(lines) {
-      return lines.map((line, i) => {
-        const x = 20 + (i % 12) * 45;
-        const yOffset = Math.floor(i / 12) * 50;
+    const GROUP_META = [
+      { key: "GOOD SERVICE", label: "Good Service", color: "#1a7f37" },
+      { key: "DELAYS", label: "Delays", color: "#b26a00" },
+      { key: "SUSPENDED", label: "Suspended", color: "#8B0000" }
+    ];
 
-        return `
-          <circle cx="${x}" cy="${yOffset}" r="16" fill="${COLORS[line] || "#000"}"/>
-          <text x="${x}" y="${yOffset + 5}" font-size="14" text-anchor="middle" fill="white" font-family="Arial" font-weight="bold">${line}</text>
-        `;
-      }).join("");
+    function circleSvg(line, x, y) {
+      const fill = COLORS[line] || "#111";
+      const textFill = fill === "#FCCC0A" ? "#000" : "#fff";
+
+      return `
+        <circle cx="${x}" cy="${y}" r="16" fill="${fill}" />
+        <text x="${x}" y="${y + 5}" font-size="14" text-anchor="middle"
+              fill="${textFill}" font-family="Arial, Helvetica, sans-serif"
+              font-weight="bold">${line}</text>
+      `;
     }
 
-    const good = data.grouped["GOOD SERVICE"];
-    const delays = data.grouped["DELAYS"];
-    const suspended = data.grouped["SUSPENDED"];
+    function renderGroup(lines, startY) {
+      const perRow = 10;
+      const xStart = 36;
+      const xGap = 52;
+      const yGap = 44;
+
+      if (!lines.length) {
+        return {
+          svg: `<text x="${xStart}" y="${startY}" font-size="15" fill="#666"
+                    font-family="Arial, Helvetica, sans-serif">None</text>`,
+          heightUsed: 24
+        };
+      }
+
+      let svg = "";
+      lines.forEach((line, i) => {
+        const row = Math.floor(i / perRow);
+        const col = i % perRow;
+        const x = xStart + col * xGap;
+        const y = startY + row * yGap;
+        svg += circleSvg(line, x, y);
+      });
+
+      const rows = Math.ceil(lines.length / perRow);
+      return {
+        svg,
+        heightUsed: rows * yGap
+      };
+    }
+
+    let y = 34;
+    let bodySvg = "";
+
+    for (const group of GROUP_META) {
+      const lines = data.grouped[group.key] || [];
+
+      bodySvg += `
+        <text x="20" y="${y}" font-size="17" fill="${group.color}"
+              font-family="Arial, Helvetica, sans-serif" font-weight="bold">
+          ${group.label}
+        </text>
+      `;
+
+      const rendered = renderGroup(lines, y + 30);
+      bodySvg += rendered.svg;
+      y += 30 + rendered.heightUsed + 26;
+    }
+
+    const totalHeight = y + 26;
 
     const svg = `
-      <svg width="600" height="320" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="white"/>
-
-        <!-- Title -->
-        <text x="20" y="30" font-size="22" font-family="Arial" font-weight="bold">
+      <svg width="600" height="${totalHeight}" viewBox="0 0 600 ${totalHeight}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#ffffff"/>
+        <rect x="0" y="0" width="600" height="56" fill="#f4f4f4"/>
+        <text x="20" y="35" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="bold" fill="#111">
           NYC Subway Status
         </text>
 
-        <!-- GOOD -->
-        <text x="20" y="70" font-size="16" fill="green" font-family="Arial">
-          Good Service
-        </text>
-        <g transform="translate(20,90)">
-          ${renderCircles(good)}
-        </g>
+        ${bodySvg}
 
-        <!-- DELAYS -->
-        <text x="20" y="170" font-size="16" fill="orange" font-family="Arial">
-          Delays
-        </text>
-        <g transform="translate(20,190)">
-          ${renderCircles(delays)}
-        </g>
-
-        <!-- SUSPENDED -->
-        <text x="20" y="250" font-size="16" fill="#8B0000" font-family="Arial">
-          Suspended
-        </text>
-        <g transform="translate(20,270)">
-          ${renderCircles(suspended)}
-        </g>
-
-        <!-- Timestamp -->
-        <text x="20" y="310" font-size="12" fill="gray" font-family="Arial">
+        <line x1="20" y1="${totalHeight - 34}" x2="580" y2="${totalHeight - 34}" stroke="#ddd" stroke-width="1"/>
+        <text x="20" y="${totalHeight - 12}" font-size="12" fill="#777"
+              font-family="Arial, Helvetica, sans-serif">
           Updated: ${updated}
         </text>
       </svg>
     `;
 
     res.setHeader("Content-Type", "image/svg+xml");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.send(svg);
-
   } catch (err) {
+    console.error("SVG error:", err);
     res.status(500).send("Error generating SVG");
   }
 });
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
