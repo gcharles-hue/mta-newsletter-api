@@ -145,3 +145,54 @@ app.get("/status-snippet", async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
+const { createCanvas } = require("canvas");
+
+app.get("/status-image.png", async (req, res) => {
+  try {
+    const data = await fetchMTA();
+
+    const width = 600;
+    const height = 250;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+
+    // background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText("NYC Subway Status", 20, 40);
+
+    ctx.font = "18px Arial";
+
+    // Good Service
+    ctx.fillStyle = "green";
+    ctx.fillText(
+      `Good: ${data.grouped["GOOD SERVICE"].join(", ") || "None"}`,
+      20,
+      90
+    );
+
+    // Delays
+    ctx.fillStyle = "orange";
+    ctx.fillText(
+      `Delays: ${data.grouped["DELAYS"].join(", ") || "None"}`,
+      20,
+      140
+    );
+
+    // Suspended
+    ctx.fillStyle = "#8B0000";
+    ctx.fillText(
+      `Suspended: ${data.grouped["SUSPENDED"].join(", ") || "None"}`,
+      20,
+      190
+    );
+
+    res.setHeader("Content-Type", "image/png");
+    canvas.createPNGStream().pipe(res);
+  } catch (err) {
+    res.status(500).send("Error generating image");
+  }
+});
