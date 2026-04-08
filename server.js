@@ -209,7 +209,7 @@ app.get("/status-image.png", async (req, res) => {
     }
 
     // match SVG layout better
-    let y = 34;
+    let y = 50;
     let sectionHeights = [];
 
     for (const group of GROUP_META) {
@@ -362,20 +362,22 @@ app.get("/status-image.svg", async (req, res) => {
         </text>
       `;
 
-      const rendered = renderGroup(lines, y + 30);
+      const rendered = renderGroup(lines, y + 38);
       bodySvg += rendered.svg;
-      y += 30 + rendered.heightUsed + 26;
+      y += 30 + rendered.heightUsed + 34;
     }
 
-    const totalHeight = y + 26;
+    const totalHeight = y + 40;
 
     const svg = `
       <svg width="600" height="${totalHeight}" viewBox="0 0 600 ${totalHeight}" xmlns="http://www.w3.org/2000/svg">
         <rect width="100%" height="100%" fill="#ffffff"/>
-        <rect x="0" y="0" width="600" height="56" fill="#f4f4f4"/>
-        <text x="20" y="35" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="bold" fill="#111">
-          NYC Subway Status
-        </text>
+        <rect x="0" y="0" width="600" height="64" fill="#f4f4f4"/>
+        <text x="300" y="40" font-size="24" text-anchor="middle"
+      font-family="Arial, Helvetica, sans-serif"
+      font-weight="bold" fill="#111">
+  🚆 NYC Subway Status
+</text>
 
         ${bodySvg}
 
