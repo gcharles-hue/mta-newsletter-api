@@ -1,3 +1,13 @@
+function setNoCache(res) {
+  res.set({
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "Surrogate-Control": "no-store",
+    "Vary": "*"
+  });
+}
+
 const express = require("express");
 const axios = require("axios");
 const GtfsRealtimeBindings = require("gtfs-realtime-bindings");
@@ -107,6 +117,7 @@ app.get("/health", (req, res) => {
 
 app.get("/status.json", async (req, res) => {
   try {
+    setNoCache(res);
     const data = await fetchMTA();
     res.json(data);
   } catch (error) {
@@ -118,16 +129,101 @@ app.get("/status.json", async (req, res) => {
   }
 });
 
-
-
 const { createCanvas } = require("canvas");
 
 app.get("/status-image.png", async (req, res) => {
   try {
+    setNoCache(res);
+
     const data = await fetchMTA();
 
+    const updated = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZoneName: "short"
+    }).format(new Date(data.updatedAt));
+
+    const COLORS = {
+      A: "#0039A6", C: "#0039A6", E: "#0039A6",
+      B: "#FF6319", D: "#FF6319", F: "#FF6319", M: "#FF6319",
+      G: "#6CBE45",
+      J: "#996633", Z: "#996633",
+      N: "#FCCC0A", Q: "#FCCC0A", R: "#FCCC0A", W: "#FCCC0A",
+      L: "#A7A9AC",
+      "1": "#EE352E", "2": "#EE352E", "3": "#EE352E",
+      "4": "#00933C", "5": "#00933C", "6": "#00933C",
+      "7": "#B933AD"
+    };
+
+    const GROUP_META = [
+      { key: "GOOD SERVICE", label: "Good Service", color: "#1a7f37" },
+      { key: "DELAYS", label: "Delays", color: "#b26a00" },
+      { key: "SUSPENDED", label: "Suspended", color: "#8B0000" }
+    ];
+
+    function drawCircle(line, x, y) {
+      const fill = COLORS[line] || "#111111";
+      const textFill = fill === "#FCCC0A" ? "#000000" : "#ffffff";
+
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+
+      ctx.fillStyle = textFill;
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(line, x, y + 1);
+    }
+
+    function drawGroup(lines, startY) {
+      const perRow = 10;
+      const xStart = 36;
+      const xGap = 52;
+      const yGap = 44;
+
+      if (!lines.length) {
+        ctx.fillStyle = "#666666";
+        ctx.font = "15px Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText("None", xStart, startY);
+        return 24;
+      }
+
+      lines.forEach((line, i) => {
+        const row = Math.floor(i / perRow);
+        const col = i % perRow;
+        const x = xStart + col * xGap;
+        const y = startY + row * yGap;
+        drawCircle(line, x, y);
+      });
+
+      const rows = Math.ceil(lines.length / perRow);
+      return rows * yGap;
+    }
+
+    // match SVG layout better
+    let y = 34;
+    let sectionHeights = [];
+
+    for (const group of GROUP_META) {
+      const lines = data.grouped[group.key] || [];
+      const rows = lines.length ? Math.ceil(lines.length / 10) : 1;
+      const heightUsed = lines.length ? rows * 44 : 24;
+      sectionHeights.push({ group, lines, y, heightUsed });
+      y += 30 + heightUsed + 26;
+    }
+
+    const totalHeight = y + 26;
     const width = 600;
-    const height = 250;
+    const height = totalHeight;
+
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext("2d");
 
@@ -135,47 +231,63 @@ app.get("/status-image.png", async (req, res) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 22px Arial";
-    ctx.fillText("NYC Subway Status", 20, 40);
+    // header bar
+    ctx.fillStyle = "#f4f4f4";
+    ctx.fillRect(0, 0, width, 56);
 
-    ctx.font = "bold 18px Arial";
+    // title
+    ctx.fillStyle = "#111111";
+    ctx.font = "bold 24px Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("NYC Subway Status", 20, 35);
 
-    // Good Service
-    ctx.fillStyle = "green";
-    ctx.fillText(
-      `Good: ${data.grouped["GOOD SERVICE"].join(", ") || "None"}`,
-      20,
-      90
-    );
+    // draw groups
+    for (const section of sectionHeights) {
+      ctx.fillStyle = section.group.color;
+      ctx.font = "bold 17px Arial";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(section.group.label, 20, section.y);
 
-    // Delays
-    ctx.fillStyle = "orange";
-    ctx.fillText(
-      `Delays: ${data.grouped["DELAYS"].join(", ") || "None"}`,
-      20,
-      140
-    );
+      drawGroup(section.lines, section.y + 30);
+    }
 
-    // Suspended
-    ctx.fillStyle = "#8B0000";
-    ctx.fillText(
-      `Suspended: ${data.grouped["SUSPENDED"].join(", ") || "None"}`,
-      20,
-      190
-    );
+    // footer divider
+    ctx.strokeStyle = "#dddddd";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(20, totalHeight - 34);
+    ctx.lineTo(580, totalHeight - 34);
+    ctx.stroke();
+
+    // footer text
+    ctx.fillStyle = "#777777";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(`Updated: ${updated}`, 20, totalHeight - 12);
 
     res.setHeader("Content-Type", "image/png");
-    canvas.createPNGStream().pipe(res);
+    res.send(canvas.toBuffer("image/png"));
   } catch (err) {
+    console.error("PNG error:", err);
     res.status(500).send("Error generating image");
   }
 });
 
 app.get("/status-image.svg", async (req, res) => {
   try {
+    setNoCache(res);
     const data = await fetchMTA();
-    const updated = new Date(data.updatedAt).toLocaleTimeString();
+    const updated = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+  timeZoneName: "short"
+}).format(new Date(data.updatedAt));
 
     const COLORS = {
       A: "#0039A6", C: "#0039A6", E: "#0039A6",
@@ -275,8 +387,8 @@ app.get("/status-image.svg", async (req, res) => {
       </svg>
     `;
 
-    res.setHeader("Content-Type", "image/svg+xml");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    
     res.send(svg);
   } catch (err) {
     console.error("SVG error:", err);
