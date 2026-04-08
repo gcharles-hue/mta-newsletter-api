@@ -362,9 +362,9 @@ app.get("/status-image.svg", async (req, res) => {
         </text>
       `;
 
-      const rendered = renderGroup(lines, y + 38);
+      const rendered = renderGroup(lines, y + 28);
       bodySvg += rendered.svg;
-      y += 30 + rendered.heightUsed + 34;
+      y += 24 + rendered.heightUsed + 18;
     }
 
     const totalHeight = y + 40;
