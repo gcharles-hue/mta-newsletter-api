@@ -192,8 +192,8 @@ app.get("/status-image.png", async (req, res) => {
         ctx.font = "15px Arial";
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
-        ctx.fillText("None", xStart, startY);
-        return 24;
+        ctx.fillText("None", xStart, startY + 2);
+return 18;
       }
 
       lines.forEach((line, i) => {
@@ -212,13 +212,24 @@ app.get("/status-image.png", async (req, res) => {
     let y = 50;
     let sectionHeights = [];
 
-    for (const group of GROUP_META) {
-      const lines = data.grouped[group.key] || [];
-      const rows = lines.length ? Math.ceil(lines.length / 10) : 1;
-      const heightUsed = lines.length ? rows * 44 : 24;
-      sectionHeights.push({ group, lines, y, heightUsed });
-      y += 30 + heightUsed + 26;
-    }
+    let y = 58;
+let sectionHeights = [];
+
+for (const group of GROUP_META) {
+  const lines = data.grouped[group.key] || [];
+  const rows = lines.length ? Math.ceil(lines.length / 10) : 1;
+  const heightUsed = lines.length ? rows * 44 : 18;
+
+  sectionHeights.push({
+    group,
+    lines,
+    labelY: y,
+    circlesY: y + 26,
+    heightUsed
+  });
+
+  y += 26 + heightUsed + 10;
+}
 
     const totalHeight = y + 26;
     const width = 600;
@@ -244,14 +255,14 @@ app.get("/status-image.png", async (req, res) => {
 
     // draw groups
     for (const section of sectionHeights) {
-      ctx.fillStyle = section.group.color;
-      ctx.font = "bold 17px Arial";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText(section.group.label, 20, section.y);
+  ctx.fillStyle = section.group.color;
+  ctx.font = "bold 17px Arial";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(section.group.label, 20, section.labelY);
 
-      drawGroup(section.lines, section.y + 30);
-    }
+  drawGroup(section.lines, section.circlesY);
+}
 
     // footer divider
     ctx.strokeStyle = "#dddddd";
