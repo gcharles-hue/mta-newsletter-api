@@ -163,7 +163,9 @@ app.get("/status-image.png", async (req, res) => {
       { key: "DELAYS", label: "Delays", color: "#b26a00" },
       { key: "SUSPENDED", label: "Suspended", color: "#8B0000" }
     ];
+    
 
+    
     function drawCircle(line, x, y) {
       const fill = COLORS[line] || "#111111";
       const textFill = fill === "#FCCC0A" ? "#000000" : "#ffffff";
@@ -209,8 +211,7 @@ return 18;
     }
 
     // match SVG layout better
-    let y = 50;
-    let sectionHeights = [];
+   
 
     let y = 58;
 let sectionHeights = [];
@@ -231,12 +232,12 @@ for (const group of GROUP_META) {
   y += 26 + heightUsed + 10;
 }
 
-    const totalHeight = y + 26;
-    const width = 600;
-    const height = totalHeight;
+    const totalHeight = y + 40;
+const width = 600;
+const height = totalHeight;
 
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
+const canvas = createCanvas(width, height);
+const ctx = canvas.getContext("2d");
 
     // background
     ctx.fillStyle = "#ffffff";
@@ -248,10 +249,10 @@ for (const group of GROUP_META) {
 
     // title
     ctx.fillStyle = "#111111";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("NYC Subway Status", 20, 35);
+ctx.font = "bold 24px Arial";
+ctx.textAlign = "center";
+ctx.textBaseline = "alphabetic";
+ctx.fillText("🚆 NYC Subway Status", 300, 40);
 
     // draw groups
     for (const section of sectionHeights) {
@@ -317,7 +318,7 @@ app.get("/status-image.svg", async (req, res) => {
       { key: "DELAYS", label: "Delays", color: "#b26a00" },
       { key: "SUSPENDED", label: "Suspended", color: "#8B0000" }
     ];
-
+    
     function circleSvg(line, x, y) {
       const fill = COLORS[line] || "#111";
       const textFill = fill === "#FCCC0A" ? "#000" : "#fff";
@@ -340,7 +341,7 @@ app.get("/status-image.svg", async (req, res) => {
         return {
           svg: `<text x="${xStart}" y="${startY}" font-size="15" fill="#666"
                     font-family="Arial, Helvetica, sans-serif">None</text>`,
-          heightUsed: 24
+          heightUsed: 18
         };
       }
 
@@ -360,7 +361,7 @@ app.get("/status-image.svg", async (req, res) => {
       };
     }
 
-    let y = 34;
+    let y = 58;
     let bodySvg = "";
 
     for (const group of GROUP_META) {
