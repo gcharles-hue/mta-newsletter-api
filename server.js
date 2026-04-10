@@ -73,19 +73,19 @@ async function fetchMTA() {
       entity.alert.descriptionText?.translation?.[0]?.text ||
       "";
 
-    const  = classify(text);
+    const status = classify(text);
 
     for (const line of ALL_LINES) {
       const regex = new RegExp(`\\b${line}\\b`, "i");
 
       if (regex.test(text)) {
-        if ( === "SUSPENDED") {
-          line[line] = "SUSPENDED";
+        if (status === "SUSPENDED") {
+          lineStatus[line] = "SUSPENDED";
         } else if (
-           === "DELAYS" &&
-          line[line] !== "SUSPENDED"
+          status === "DELAYS" &&
+          lineStatus[line] !== "SUSPENDED"
         ) {
-          line[line] = "DELAYS";
+          lineStatus[line] = "DELAYS";
         }
       }
     }
@@ -94,7 +94,7 @@ async function fetchMTA() {
   return {
     updatedAt: new Date().toISOString(),
     grouped: {
-      "GOOD SERVICE": Object.keys(line).filter(
+      "GOOD SERVICE": Object.keys(lineStatus).filter(
         (line) => lineStatus[line] === "GOOD SERVICE"
       ),
       "DELAYS": Object.keys(lineStatus).filter(
