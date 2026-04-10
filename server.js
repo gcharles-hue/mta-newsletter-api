@@ -73,19 +73,19 @@ async function fetchMTA() {
       entity.alert.descriptionText?.translation?.[0]?.text ||
       "";
 
-    const status = classify(text);
+    const  = classify(text);
 
     for (const line of ALL_LINES) {
       const regex = new RegExp(`\\b${line}\\b`, "i");
 
       if (regex.test(text)) {
-        if (status === "SUSPENDED") {
-          lineStatus[line] = "SUSPENDED";
+        if ( === "SUSPENDED") {
+          line[line] = "SUSPENDED";
         } else if (
-          status === "DELAYS" &&
-          lineStatus[line] !== "SUSPENDED"
+           === "DELAYS" &&
+          line[line] !== "SUSPENDED"
         ) {
-          lineStatus[line] = "DELAYS";
+          line[line] = "DELAYS";
         }
       }
     }
@@ -94,7 +94,7 @@ async function fetchMTA() {
   return {
     updatedAt: new Date().toISOString(),
     grouped: {
-      "GOOD SERVICE": Object.keys(lineStatus).filter(
+      "GOOD SERVICE": Object.keys(line).filter(
         (line) => lineStatus[line] === "GOOD SERVICE"
       ),
       "DELAYS": Object.keys(lineStatus).filter(
@@ -252,7 +252,7 @@ const ctx = canvas.getContext("2d");
 ctx.font = "bold 24px Arial";
 ctx.textAlign = "center";
 ctx.textBaseline = "alphabetic";
-ctx.fillText("🚆 NYC Subway Status", 300, 40);
+ctx.fillText("NYC Subway Status", 300, 40);
 
     // draw groups
     for (const section of sectionHeights) {
@@ -388,7 +388,7 @@ app.get("/status-image.svg", async (req, res) => {
         <text x="300" y="40" font-size="24" text-anchor="middle"
       font-family="Arial, Helvetica, sans-serif"
       font-weight="bold" fill="#111">
-  🚆 NYC Subway Status
+   NYC Subway Status
 </text>
 
         ${bodySvg}
